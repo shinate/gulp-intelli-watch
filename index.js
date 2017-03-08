@@ -1,6 +1,5 @@
 const path = require('path');
-const { src } = require('vinyl-fs');
-const { watch } = require('chokidar');
+const { src, watch } = require('gulp');
 const through = require('through2');
 
 function watchEndpoint(filePath, originalSources, taskLogic) {
