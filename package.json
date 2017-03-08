@@ -1,0 +1,27 @@
+{
+  "name": "gulp-intelli-watch",
+  "version": "0.1.0",
+  "description": "Rebuilds only the endpoints relevant to changed files",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "gulp",
+    "watch",
+    "incremental",
+    "performance",
+    "chokidar"
+  ],
+  "author": "Brandon Poe <brandonpoe@me.com>",
+  "repository" : {
+    "type" : "git",
+    "url" : "https://github.com/btpoe/gulp-intelli-watch.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "chokidar": "^1.6.1",
+    "through2": "^2.0.3",
+    "vinyl-fs": "^2.4.4"
+  }
+}
