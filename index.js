@@ -2,87 +2,131 @@ const path = require('path');
 const { src, watch } = require('gulp');
 const through = require('through2');
 
-function watchEndpoint(filePath, originalSources, taskLogic) {
-    let oldSources = [];
-    let watcher;
+const doesNotInclude = arr => source => !arr.includes(source);
 
-    function normalizeSources(sources) {
-        const normal = new Set(sources.map(source =>
-            path.resolve(path.dirname(filePath), source)
+const watcher = watch('package.json')
+    .unwatch('package.json')
+    .on('change', executeTasks);
+
+const sources = {};
+const endpoints = {};
+
+function addEndpointToSource(endpoint, source) {
+    if (!sources[source]) {
+        sources[source] = new Set();
+        watcher.add(source);
+    }
+    sources[source].add(endpoint);
+}
+
+function removeEndpointFromSource(endpoint, source) {
+    sources[source].delete(endpoint);
+
+    if (sources[source].size === 0) {
+        delete sources[source];
+        watcher.unwatch(source);
+    }
+}
+
+function registerEndpoint(endpoint, taskLogic) {
+    if (!endpoints[endpoint]) {
+        endpoints[endpoint] = new Set();
+    }
+    endpoints[endpoint].add(taskLogic);
+    addEndpointToSource(endpoint, endpoint);
+}
+
+function unregisterEndpoint(endpoint, taskLogic) {
+    endpoints[endpoint].delete(taskLogic);
+
+    if (endpoints[endpoint].size === 0) {
+        delete endpoints[endpoint];
+        Object.keys(sources).forEach(removeEndpointFromSource.bind(null, endpoint));
+    }
+}
+
+function executeTasks(source) {
+    (sources[source] || []).forEach(endpoint => {
+        endpoints[endpoint].forEach(task => task(endpoint));
+    })
+}
+
+function watchEndpoint(endpoint, originalSources, taskLogic) {
+    let oldSources = [];
+
+    function normalizeSources(rawSources) {
+        const normal = new Set(rawSources.map(source =>
+            path.resolve(path.dirname(endpoint), source)
         ));
-        normal.add(filePath);
+        normal.add(endpoint);
         return Array.from(normal);
     }
 
-    function identical(oldSources, currentSources) {
-        const includes = arr => source => arr.includes(source);
-        return oldSources.every(includes(currentSources)) && currentSources.every(includes(oldSources));
-    }
-
     function compareSources(currentSources) {
-        if (!identical(oldSources, currentSources)) {
-            if (watcher) {
-                watcher.close()
-            }
-            oldSources = currentSources;
-            watcher = watch(currentSources)
-                .on('change', watchLogic)
-                .on('unlink', unlinkedFilePath => {
-                    if (unlinkedFilePath === filePath && watcher) {
-                        watcher.close();
-                    }
-                });
-        }
+        currentSources = normalizeSources(currentSources);
+
+        oldSources
+            .filter(doesNotInclude(currentSources))
+            .forEach(removeEndpointFromSource.bind(null, endpoint));
+
+        currentSources
+            .filter(doesNotInclude(oldSources))
+            .forEach(addEndpointToSource.bind(null, endpoint));
+
+        oldSources = currentSources;
     }
 
-    function watchLogic() {
-        taskLogic(filePath)
-            .pipe(through.obj(function(file, enc, taskDone) {
-                compareSources(normalizeSources(file.sourceMap.sources));
-                this.push(file);
-                taskDone();
-            }));
-    }
+    compareSources(originalSources);
 
-    compareSources(normalizeSources(originalSources));
+    return () => taskLogic(endpoint)
+        .pipe(through.obj(function (file, enc, taskDone) {
+            compareSources(file.sourceMap.sources);
+            this.push(file);
+            taskDone();
+        }));
 }
 
-module.exports = function(glob, taskLogic) {
-    let hasSources = false;
-    let watcher;
+function absoluteEndpoint(endpoint) {
+    return path.resolve(process.cwd(), endpoint);
+}
 
-    function checkForSources(filePath) {
-        return taskLogic(filePath)
-            .pipe(through.obj(function(file, enc, taskDone) {
-                if (file.sourceMap) {
-                    hasSources = true;
-                    watchEndpoint(filePath, file.sourceMap.sources, taskLogic)
-                }
+module.exports = function (glob, taskLogic) {
+    const addedEndpoints = new Set();
+    const endpointTasks = {};
+
+    function checkForSourceMap(endpoint) {
+        endpoint = absoluteEndpoint(endpoint);
+
+        if (addedEndpoints.has(endpoint)) return;
+        addedEndpoints.add(endpoint);
+
+        return taskLogic(endpoint)
+            .pipe(through.obj(function (file, enc, taskDone) {
+                endpointTasks[endpoint] = file.sourceMap ?
+                    watchEndpoint(endpoint, file.sourceMap.sources, taskLogic)
+                    : taskLogic;
+
+                registerEndpoint(endpoint, endpointTasks[endpoint]);
+
                 this.push(file);
                 taskDone();
             }));
     }
 
-    function createGlobalWatcher() {
-        if (watcher) return;
-        watcher = watch(glob);
-
-        if (hasSources) {
-            watcher.on('add', checkForSources);
-        } else {
-            watcher.on('change', taskLogic)
-        }
+    function onUnlink(endpoint) {
+        endpoint = absoluteEndpoint(endpoint);
+        addedEndpoints.delete(endpoint);
+        unregisterEndpoint(endpoint, endpointTasks[endpoint]);
     }
 
-    return function() {
+    return () => {
+        watch(glob)
+            .on('add', checkForSourceMap)
+            .on('unlink', onUnlink);
+
         return src(glob)
-            .pipe(through.obj(function(file, enc, srcDone) {
-                checkForSources(file.path)
-                    .pipe(through.obj(function(file, enc, checkDone) {
-                        createGlobalWatcher();
-                        this.push(file);
-                        checkDone();
-                    }));
+            .pipe(through.obj(function (file, enc, srcDone) {
+                checkForSourceMap(file.path);
                 this.push(file);
                 srcDone();
             }));
