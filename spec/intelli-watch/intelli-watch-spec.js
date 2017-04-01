@@ -4,6 +4,8 @@ const path = require('path');
 const SPEC_DIR = path.resolve(__dirname, '..');
 const ASSET_DIR = path.resolve(SPEC_DIR, 'assets');
 
+const CSS_RULE = 'a { color: yellow; }';
+
 describe('IntelliWatch', function() {
     const watch = require('../../index');
     const { config, taskLogic } = require('../tasks/styles');
@@ -31,7 +33,7 @@ describe('IntelliWatch', function() {
     });
 
     it('should be able to watch a file change', function(done) {
-        execSync('echo "a { color: red; }" >> partials/_d.scss', {
+        execSync(`echo "${CSS_RULE}" >> partials/_d.scss`, {
             cwd: ASSET_DIR
         });
 
@@ -43,7 +45,7 @@ describe('IntelliWatch', function() {
     });
 
     it('should update watch when a new endpoint it created', function(done) {
-        execSync('echo "a { color: red; }" >> g.scss', {
+        execSync(`echo "${CSS_RULE}" >> g.scss`, {
             cwd: ASSET_DIR
         });
 
@@ -51,7 +53,7 @@ describe('IntelliWatch', function() {
             expect(touchedSources.length).toBe(1);
             expect(touchedSources[0]).toBe('g.scss');
 
-            execSync('echo "a { color: blue; }" >> g.scss', {
+            execSync(`echo "${CSS_RULE}" >> g.scss`, {
                 cwd: ASSET_DIR
             });
 
@@ -74,7 +76,7 @@ describe('IntelliWatch', function() {
         });
 
         setTimeout(() => {
-            execSync('echo "a { color: blue; }" >> partials/_e.scss', {
+            execSync(`echo "${CSS_RULE}" >> partials/_e.scss`, {
                 cwd: ASSET_DIR
             });
 
@@ -95,7 +97,7 @@ describe('IntelliWatch', function() {
             expect(touchedSources.length).toBe(1);
             expect(touchedSources[0]).toBe('a.scss');
 
-            execSync('echo "a { color: blue; }" >> partials/_f.scss', {
+            execSync(`echo "${CSS_RULE}" >> partials/_f.scss`, {
                 cwd: ASSET_DIR
             });
 
@@ -105,6 +107,17 @@ describe('IntelliWatch', function() {
                 expect(setATwice).toBe(true);
                 done();
             }, 200);
+        }, 200);
+    });
+
+    it('should ignore new partials not part of the endpoint glob', function(done) {
+        execSync(`echo "${CSS_RULE}" >> partials/_new.scss`, {
+            cwd: ASSET_DIR
+        });
+
+        setTimeout(() => {
+            expect(touchedSources.length).toBe(0);
+            done();
         }, 200);
     });
 });

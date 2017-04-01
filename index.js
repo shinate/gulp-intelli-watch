@@ -4,9 +4,7 @@ const through = require('through2');
 
 const doesNotInclude = arr => source => !arr.includes(source);
 
-const watcher = watch('package.json')
-    .unwatch('package.json')
-    .on('change', executeTasks);
+let watcher;
 
 const sources = {};
 const endpoints = {};
@@ -120,6 +118,10 @@ module.exports = function (glob, taskLogic) {
     }
 
     return () => {
+        watcher = watcher || watch('package.json')
+            .unwatch('package.json')
+            .on('change', executeTasks);
+
         watch(glob)
             .on('add', checkForSourceMap)
             .on('unlink', onUnlink);

@@ -4,8 +4,8 @@ const sass = require('gulp-sass');
 
 const config = {
     src: [
-        './spec/assets/**/*.scss',
-        '!./spec/assets/**/_*.scss',
+        'spec/assets/**/*.scss',
+        '!spec/assets/**/_*.scss',
     ],
 };
 
