@@ -49,12 +49,12 @@ function executeTasks(source) {
     })
 }
 
-function watchEndpoint(endpoint, originalSources, taskLogic) {
+function watchEndpoint(endpoint, base, originalSources, taskLogic) {
     let oldSources = [];
 
     function normalizeSources(rawSources) {
         const normal = new Set(rawSources.map(source =>
-            path.resolve(path.dirname(endpoint), source)
+            path.resolve(base, source)
         ));
         normal.add(endpoint);
         return Array.from(normal);
@@ -102,7 +102,7 @@ module.exports = function (glob, taskLogic) {
             .pipe(through.obj(function (file, enc, taskDone) {
                 if (path.extname(file.path) !== '.map') {
                     endpointTasks[endpoint] = file.sourceMap ?
-                        watchEndpoint(endpoint, file.sourceMap.sources, taskLogic)
+                        watchEndpoint(endpoint, file.base, file.sourceMap.sources, taskLogic)
                         : taskLogic;
 
                     registerEndpoint(endpoint, endpointTasks[endpoint]);
