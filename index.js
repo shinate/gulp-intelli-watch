@@ -100,7 +100,7 @@ module.exports = function (glob, taskLogic) {
 
         return taskLogic(endpoint)
             .pipe(through.obj(function (file, enc, taskDone) {
-                if (path.extname(file) !== '.map') {
+                if (path.extname(file.path) !== '.map') {
                     endpointTasks[endpoint] = file.sourceMap ?
                         watchEndpoint(endpoint, file.sourceMap.sources, taskLogic)
                         : taskLogic;
