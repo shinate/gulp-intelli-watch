@@ -1,6 +1,6 @@
 {
   "name": "gulp-intelli-watch",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Rebuilds only the endpoints relevant to changed files",
   "main": "index.js",
   "scripts": {
