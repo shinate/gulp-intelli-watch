@@ -13,6 +13,7 @@ function taskLogic(src) {
     return gulp.src(src)
         .pipe(sourcemaps.init())
         .pipe(sass())
+        .pipe(sourcemaps.write('.'))
 }
 
 function styles() {
