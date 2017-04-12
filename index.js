@@ -88,7 +88,11 @@ function absoluteEndpoint(endpoint) {
     return path.resolve(process.cwd(), endpoint);
 }
 
-module.exports = function (glob, taskLogic) {
+module.exports = function (glob, opts, taskLogic) {
+    if (typeof opts === 'function') {
+        taskLogic = opts;
+        opts = {};
+    }
     const addedEndpoints = new Set();
     const endpointTasks = {};
 
@@ -102,7 +106,7 @@ module.exports = function (glob, taskLogic) {
             .pipe(through.obj(function (file, enc, taskDone) {
                 if (path.extname(file.path) !== '.map') {
                     endpointTasks[endpoint] = file.sourceMap ?
-                        watchEndpoint(endpoint, file.base, file.sourceMap.sources, taskLogic)
+                        watchEndpoint(endpoint, opts.base || file.base, file.sourceMap.sources, taskLogic)
                         : taskLogic;
 
                     registerEndpoint(endpoint, endpointTasks[endpoint]);
