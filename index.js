@@ -73,7 +73,6 @@ function watchEndpoint(endpoint, taskLogic) {
     }
 
     function compareSources(currentSources) {
-
         currentSources = normalizeSources(currentSources);
 
         oldSources
@@ -87,7 +86,7 @@ function watchEndpoint(endpoint, taskLogic) {
         oldSources = currentSources;
     }
 
-    function watchTask() {
+    function findSources() {
         madge(endpoint, {
             showFileExtension: true
         })
@@ -95,12 +94,14 @@ function watchEndpoint(endpoint, taskLogic) {
                 compareSources(Object.keys(res.tree))
             })
             .catch(e => console.error(e));
-        return taskLogic(endpoint);
     }
 
-    watchTask();
+    findSources();
 
-    return watchTask;
+    return () => {
+        findSources();
+        return taskLogic(endpoint);
+    };
 }
 
 function absoluteEndpoint(endpoint) {
@@ -120,6 +121,7 @@ module.exports = function (glob, taskLogic) {
         endpointTasks[endpoint] = hasSources(endpoint) ? watchEndpoint(endpoint, taskLogic) : taskLogic;
 
         registerEndpoint(endpoint, endpointTasks[endpoint]);
+        return taskLogic(endpoint);
     }
 
     function onUnlink(endpoint) {
