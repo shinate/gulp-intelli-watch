@@ -1,6 +1,17 @@
 const path = require('path');
 const { src, watch } = require('gulp');
+const madge = require('madge');
 const through = require('through2');
+
+const hasSources = filePath => [
+    '.js',
+    '.jsx',
+    '.mjs',
+    '.scss',
+    '.sass',
+    '.less',
+    '.styl'
+].includes(path.extname(filePath));
 
 const doesNotInclude = arr => source => !arr.includes(source);
 
@@ -49,8 +60,9 @@ function executeTasks(source) {
     })
 }
 
-function watchEndpoint(endpoint, base, originalSources, taskLogic) {
+function watchEndpoint(endpoint, taskLogic) {
     let oldSources = [];
+    const base = path.dirname(endpoint);
 
     function normalizeSources(rawSources) {
         const normal = new Set(rawSources.map(source =>
@@ -61,6 +73,7 @@ function watchEndpoint(endpoint, base, originalSources, taskLogic) {
     }
 
     function compareSources(currentSources) {
+
         currentSources = normalizeSources(currentSources);
 
         oldSources
@@ -74,47 +87,39 @@ function watchEndpoint(endpoint, base, originalSources, taskLogic) {
         oldSources = currentSources;
     }
 
-    compareSources(originalSources);
+    function watchTask() {
+        madge(endpoint, {
+            showFileExtension: true
+        })
+            .then(res => {
+                compareSources(Object.keys(res.tree))
+            })
+            .catch(e => console.error(e));
+        return taskLogic(endpoint);
+    }
 
-    return () => taskLogic(endpoint)
-        .pipe(through.obj(function (file, enc, taskDone) {
-            compareSources(file.sourceMap.sources);
-            this.push(file);
-            taskDone();
-        }));
+    watchTask();
+
+    return watchTask;
 }
 
 function absoluteEndpoint(endpoint) {
     return path.resolve(process.cwd(), endpoint);
 }
 
-module.exports = function (glob, opts, taskLogic) {
-    if (typeof opts === 'function') {
-        taskLogic = opts;
-        opts = {};
-    }
+module.exports = function (glob, taskLogic) {
     const addedEndpoints = new Set();
     const endpointTasks = {};
 
-    function checkForSourceMap(endpoint) {
+    function checkSourceType(endpoint) {
         endpoint = absoluteEndpoint(endpoint);
 
         if (addedEndpoints.has(endpoint)) return;
         addedEndpoints.add(endpoint);
 
-        return taskLogic(endpoint)
-            .pipe(through.obj(function (file, enc, taskDone) {
-                if (path.extname(file.path) !== '.map') {
-                    endpointTasks[endpoint] = file.sourceMap ?
-                        watchEndpoint(endpoint, opts.base, file.sourceMap.sources, taskLogic)
-                        : taskLogic;
+        endpointTasks[endpoint] = hasSources(endpoint) ? watchEndpoint(endpoint, taskLogic) : taskLogic;
 
-                    registerEndpoint(endpoint, endpointTasks[endpoint]);
-                }
-
-                this.push(file);
-                taskDone();
-            }));
+        registerEndpoint(endpoint, endpointTasks[endpoint]);
     }
 
     function onUnlink(endpoint) {
@@ -129,13 +134,12 @@ module.exports = function (glob, opts, taskLogic) {
             .on('change', executeTasks);
 
         watch(glob)
-            .on('add', checkForSourceMap)
+            .on('add', checkSourceType)
             .on('unlink', onUnlink);
 
         return src(glob)
             .pipe(through.obj(function (file, enc, srcDone) {
-                opts.base = opts.base || file.base;
-                checkForSourceMap(file.path);
+                checkSourceType(file.path);
                 this.push(file);
                 srcDone();
             }));
